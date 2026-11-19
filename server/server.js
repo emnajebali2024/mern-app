@@ -31,3 +31,4 @@ async function startServer() {
 }
 
 startServer();
+// Test CI : déclenchement sélectif du serveur uniquement

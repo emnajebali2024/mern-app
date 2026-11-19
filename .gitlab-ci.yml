@@ -1,0 +1,48 @@
+image: docker:28.5.2-cli
+
+services:
+  - name: docker:28.5.2-dind
+    alias: docker
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+
+stages: [build_push]
+
+build_push_server:
+  stage: build_push
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+      changes: ["server/**/*", ".gitlab-ci.yml"]
+  script:
+    - docker build -t "$IMAGE_SERVER:$CI_COMMIT_SHORT_SHA" server
+    - >-
+      docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+      aquasec/trivy:0.76.2 image
+      "$IMAGE_SERVER:$CI_COMMIT_SHORT_SHA" > trivy_server.txt
+    - cat trivy_server.txt
+    - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
+    - docker push "$IMAGE_SERVER:$CI_COMMIT_SHORT_SHA"
+  artifacts:
+    when: always
+    paths: [trivy_server.txt]
+
+build_push_client:
+  stage: build_push
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+      changes: ["client/**/*", ".gitlab-ci.yml"]
+  script:
+    - docker build -t "$IMAGE_CLIENT:$CI_COMMIT_SHORT_SHA" client
+    - >-
+      docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+      aquasec/trivy:0.76.2 image
+      "$IMAGE_CLIENT:$CI_COMMIT_SHORT_SHA" > trivy_client.txt
+    - cat trivy_client.txt
+    - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
+    - docker push "$IMAGE_CLIENT:$CI_COMMIT_SHORT_SHA"
+  artifacts:
+    when: always
+    paths: [trivy_client.txt]
+# trigger pipeline after account verification
